@@ -1,0 +1,29 @@
+﻿using System.ComponentModel.DataAnnotations;
+
+namespace ProductService.Application.Models
+{
+    public sealed class ProductDto
+    {
+        public Guid Id { get; init; }
+        public string Name { get; init; } = default!;
+        public decimal Price { get; init; }
+    }
+
+    public sealed class CreateProductRequest
+    {
+        [Required, StringLength(200)]
+        public string Name { get; init; } = default!;
+
+        [Range(0, double.MaxValue)]
+        public decimal Price { get; init; }
+    }
+
+    public sealed class UpdateProductRequest
+    {
+        [Required, StringLength(200)]
+        public string Name { get; init; } = default!;
+
+        [Range(0, double.MaxValue)]
+        public decimal Price { get; init; }
+    }
+}
