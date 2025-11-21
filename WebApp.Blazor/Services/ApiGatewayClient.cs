@@ -1,4 +1,6 @@
 ﻿using System.Net;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 
@@ -51,19 +53,39 @@ namespace WebApp.Blazor.Services
     public class ApiGatewayClient
     {
         private readonly HttpClient _http;
-
-        // TODO: hook this to a real login later
-        private static readonly Guid EmployeeId =
-            Guid.Parse("11111111-1111-1111-1111-111111111111");
+        private readonly AuthState _authState;
 
         private static readonly JsonSerializerOptions JsonOptions = new()
         {
             PropertyNameCaseInsensitive = true
         };
 
-        public ApiGatewayClient(HttpClient http)
+        public ApiGatewayClient(HttpClient http, AuthState authState)
         {
             _http = http;
+            _authState = authState;
+        }
+
+        private HttpRequestMessage CreateRequest(HttpMethod method, string uri, HttpContent? content = null)
+        {
+            var request = new HttpRequestMessage(method, uri);
+
+            if (!string.IsNullOrEmpty(_authState.Token))
+            {
+                request.Headers.Authorization =
+                    new AuthenticationHeaderValue("Bearer", _authState.Token);
+            }
+
+            request.Headers.Add("X-Employee-Id", _authState.EmployeeId.ToString());
+
+            if (content != null)
+            {
+                request.Content = content;
+            }
+
+            Console.WriteLine($"[ApiGatewayClient] {method} {uri}, hasToken={(!string.IsNullOrEmpty(_authState.Token))}");
+
+            return request;
         }
 
         // ===== PRODUCTS CRUD =====
@@ -71,7 +93,9 @@ namespace WebApp.Blazor.Services
         public async Task<IReadOnlyList<ProductDto>> GetProductsAsync(
             CancellationToken cancellationToken = default)
         {
-            var response = await _http.GetAsync("api/products", cancellationToken);
+            using var request = CreateRequest(HttpMethod.Get, "api/products");
+            using var response = await _http.SendAsync(request, cancellationToken);
+
             response.EnsureSuccessStatusCode();
 
             var products = await response.Content
@@ -84,7 +108,8 @@ namespace WebApp.Blazor.Services
             Guid id,
             CancellationToken cancellationToken = default)
         {
-            var response = await _http.GetAsync($"api/products/{id}", cancellationToken);
+            using var request = CreateRequest(HttpMethod.Get, $"api/products/{id}");
+            using var response = await _http.SendAsync(request, cancellationToken);
 
             if (response.StatusCode == HttpStatusCode.NotFound)
                 return null;
@@ -99,7 +124,10 @@ namespace WebApp.Blazor.Services
             ProductUpsertRequest model,
             CancellationToken cancellationToken = default)
         {
-            var response = await _http.PostAsJsonAsync("api/products", model, JsonOptions, cancellationToken);
+            var json = JsonSerializer.Serialize(model, JsonOptions);
+            using var content = new StringContent(json, Encoding.UTF8, "application/json");
+            using var request = CreateRequest(HttpMethod.Post, "api/products", content);
+            using var response = await _http.SendAsync(request, cancellationToken);
 
             if (!response.IsSuccessStatusCode)
                 return null;
@@ -113,7 +141,11 @@ namespace WebApp.Blazor.Services
             ProductUpsertRequest model,
             CancellationToken cancellationToken = default)
         {
-            var response = await _http.PutAsJsonAsync($"api/products/{id}", model, JsonOptions, cancellationToken);
+            var json = JsonSerializer.Serialize(model, JsonOptions);
+            using var content = new StringContent(json, Encoding.UTF8, "application/json");
+            using var request = CreateRequest(HttpMethod.Put, $"api/products/{id}", content);
+            using var response = await _http.SendAsync(request, cancellationToken);
+
             return response.IsSuccessStatusCode;
         }
 
@@ -121,7 +153,9 @@ namespace WebApp.Blazor.Services
             Guid id,
             CancellationToken cancellationToken = default)
         {
-            var response = await _http.DeleteAsync($"api/products/{id}", cancellationToken);
+            using var request = CreateRequest(HttpMethod.Delete, $"api/products/{id}");
+            using var response = await _http.SendAsync(request, cancellationToken);
+
             return response.IsSuccessStatusCode;
         }
 
@@ -130,10 +164,9 @@ namespace WebApp.Blazor.Services
         public async Task<IReadOnlyList<OrderDto>> GetOrdersAsync(
             CancellationToken cancellationToken = default)
         {
-            using var request = new HttpRequestMessage(HttpMethod.Get, "api/orders");
-            request.Headers.Add("X-Employee-Id", EmployeeId.ToString());
+            using var request = CreateRequest(HttpMethod.Get, "api/orders");
+            using var response = await _http.SendAsync(request, cancellationToken);
 
-            var response = await _http.SendAsync(request, cancellationToken);
             response.EnsureSuccessStatusCode();
 
             var orders = await response.Content
@@ -146,10 +179,8 @@ namespace WebApp.Blazor.Services
             Guid id,
             CancellationToken cancellationToken = default)
         {
-            using var request = new HttpRequestMessage(HttpMethod.Get, $"api/orders/{id}");
-            request.Headers.Add("X-Employee-Id", EmployeeId.ToString());
-
-            var response = await _http.SendAsync(request, cancellationToken);
+            using var request = CreateRequest(HttpMethod.Get, $"api/orders/{id}");
+            using var response = await _http.SendAsync(request, cancellationToken);
 
             if (response.StatusCode == HttpStatusCode.NotFound)
                 return null;
@@ -164,15 +195,10 @@ namespace WebApp.Blazor.Services
             CreateOrderRequest model,
             CancellationToken cancellationToken = default)
         {
-            var json = JsonSerializer.Serialize(model);
-            using var request = new HttpRequestMessage(HttpMethod.Post, "api/orders")
-            {
-                Content = new StringContent(json, Encoding.UTF8, "application/json")
-            };
-
-            request.Headers.Add("X-Employee-Id", EmployeeId.ToString());
-
-            var response = await _http.SendAsync(request, cancellationToken);
+            var json = JsonSerializer.Serialize(model, JsonOptions);
+            using var content = new StringContent(json, Encoding.UTF8, "application/json");
+            using var request = CreateRequest(HttpMethod.Post, "api/orders", content);
+            using var response = await _http.SendAsync(request, cancellationToken);
 
             if (!response.IsSuccessStatusCode)
                 return null;
@@ -186,15 +212,10 @@ namespace WebApp.Blazor.Services
             UpdateOrderRequest model,
             CancellationToken cancellationToken = default)
         {
-            var json = JsonSerializer.Serialize(model);
-            using var request = new HttpRequestMessage(HttpMethod.Put, $"api/orders/{id}")
-            {
-                Content = new StringContent(json, Encoding.UTF8, "application/json")
-            };
-
-            request.Headers.Add("X-Employee-Id", EmployeeId.ToString());
-
-            var response = await _http.SendAsync(request, cancellationToken);
+            var json = JsonSerializer.Serialize(model, JsonOptions);
+            using var content = new StringContent(json, Encoding.UTF8, "application/json");
+            using var request = CreateRequest(HttpMethod.Put, $"api/orders/{id}", content);
+            using var response = await _http.SendAsync(request, cancellationToken);
 
             return response.IsSuccessStatusCode;
         }
@@ -203,10 +224,8 @@ namespace WebApp.Blazor.Services
             Guid id,
             CancellationToken cancellationToken = default)
         {
-            using var request = new HttpRequestMessage(HttpMethod.Delete, $"api/orders/{id}");
-            request.Headers.Add("X-Employee-Id", EmployeeId.ToString());
-
-            var response = await _http.SendAsync(request, cancellationToken);
+            using var request = CreateRequest(HttpMethod.Delete, $"api/orders/{id}");
+            using var response = await _http.SendAsync(request, cancellationToken);
 
             return response.IsSuccessStatusCode;
         }

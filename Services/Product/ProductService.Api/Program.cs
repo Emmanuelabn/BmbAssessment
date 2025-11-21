@@ -31,6 +31,32 @@ builder.Services.AddHealthChecks()
 
 var app = builder.Build();
 
+//var internalSecret = app.Configuration["InternalApi:SharedKey"];
+
+//app.Use(async (context, next) =>
+//{
+//    var path = context.Request.Path.Value ?? string.Empty;
+
+//    if (path.StartsWith("/health"))
+//    {
+//        await next();
+//        return;
+//    }
+
+//    if (!string.IsNullOrEmpty(internalSecret))
+//    {
+//        if (!context.Request.Headers.TryGetValue("X-Internal-Secret", out var header) ||
+//            header != internalSecret)
+//        {
+//            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+//            await context.Response.WriteAsync("Unauthorized");
+//            return;
+//        }
+//    }
+
+//    await next();
+//});
+
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
