@@ -1,0 +1,139 @@
+﻿@page "/orders/edit/{Id:guid}"
+@rendermode InteractiveServer
+@using WebApp.Blazor.Services
+@inject ApiGatewayClient Api
+@inject NavigationManager Nav
+
+<h1>Edit Order</h1>
+
+@if (isLoading)
+{
+    <p>Loading order...</p>
+}
+else if (!string.IsNullOrEmpty(errorMessage))
+{
+    <p class="text-danger">@errorMessage</p>
+}
+else
+{
+    <EditForm Model="model" OnValidSubmit="HandleValidSubmit">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+
+        <div class="mb-3">
+            <label class="form-label">Product</label>
+            <select class="form-select" @bind="model.ProductId">
+                @foreach (var product in products)
+                {
+                    <option value="@product.Id">@product.Name (@product.Price)</option>
+                }
+            </select>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Quantity</label>
+            <InputNumber class="form-control" @bind-Value="model.Quantity" />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Client Id (GUID)</label>
+            <InputText class="form-control" @bind-Value="clientIdText" />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Order Date</label>
+            <InputDate class="form-control" @bind-Value="orderDate" />
+        </div>
+
+        <button class="btn btn-primary" type="submit" disabled="@isSaving">
+            @(isSaving ? "Saving..." : "Save")
+        </button>
+
+        <a class="btn btn-secondary ms-2" href="/orders">Cancel</a>
+    </EditForm>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private List<ProductDto> products = new();
+    private UpdateOrderRequest model = new();
+    private DateTime orderDate = DateTime.Today;
+    private string clientIdText = string.Empty;
+
+    private bool isLoading = true;
+    private bool isSaving;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            // load products first
+            products = (await Api.GetProductsAsync()).ToList();
+
+            var order = await Api.GetOrderAsync(Id);
+            if (order is null)
+            {
+                errorMessage = "Order not found.";
+                return;
+            }
+
+            model.ProductId = order.ProductId;
+            model.Quantity = order.Quantity;
+            model.ClientId = order.ClientId;
+            orderDate = order.OrderDate;
+            clientIdText = order.ClientId.ToString();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to load order: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        errorMessage = null;
+
+        if (!Guid.TryParse(clientIdText, out var clientId))
+        {
+            errorMessage = "Client Id must be a valid GUID.";
+            return;
+        }
+
+        if (model.ProductId == Guid.Empty)
+        {
+            errorMessage = "Please select a product.";
+            return;
+        }
+
+        model.ClientId = clientId;
+        model.OrderDate = orderDate;
+
+        try
+        {
+            isSaving = true;
+            var ok = await Api.UpdateOrderAsync(Id, model);
+
+            if (!ok)
+            {
+                errorMessage = "Failed to update order.";
+                return;
+            }
+
+            Nav.NavigateTo("/orders");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error updating order: {ex.Message}";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+}

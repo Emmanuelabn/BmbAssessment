@@ -1,0 +1,92 @@
+﻿@page "/products"
+@rendermode InteractiveServer
+@using WebApp.Blazor.Services
+@inject ApiGatewayClient Api
+
+<h1>Products</h1>
+
+@if (isLoading)
+{
+        <p>Loading products...</p>
+}
+else if (!string.IsNullOrEmpty(errorMessage))
+{
+        <p class="text-danger">@errorMessage</p>
+}
+else if (products.Count == 0)
+{
+        <p>No products yet.</p>
+}
+else
+{
+        <table class="table table-striped">
+            <thead>
+            <tr>
+                <th>Name</th>
+                <th>Price</th>
+                <th style="width: 200px;">Actions</th>
+            </tr>
+            </thead>
+            <tbody>
+            @foreach (var p in products)
+            {
+                    <tr>
+                        <td>@p.Name</td>
+                        <td>@p.Price</td>
+                        <td>
+                            <a class="btn btn-sm btn-secondary me-2" href="/products/edit/@p.Id">Edit</a>
+                            <button class="btn btn-sm btn-danger" @onclick="() => DeleteProduct(p.Id)">Delete</button>
+                        </td>
+                    </tr>
+            }
+            </tbody>
+        </table>
+}
+
+<a class="btn btn-primary" href="/products/create">Create Product</a>
+
+@code {
+    private List<ProductDto> products = new();
+    private bool isLoading = true;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadProducts();
+    }
+
+    private async Task LoadProducts()
+    {
+        try
+        {
+            isLoading = true;
+            products = (await Api.GetProductsAsync()).ToList();
+            errorMessage = null;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to load products: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task DeleteProduct(Guid id)
+    {
+        try
+        {
+            var ok = await Api.DeleteProductAsync(id);
+            if (!ok)
+            {
+                errorMessage = "Failed to delete product.";
+            }
+            await LoadProducts();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error deleting product: {ex.Message}";
+        }
+    }
+}

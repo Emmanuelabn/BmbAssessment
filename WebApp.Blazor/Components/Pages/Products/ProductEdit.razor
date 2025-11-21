@@ -1,0 +1,98 @@
+﻿@page "/products/edit/{Id:guid}"
+@rendermode InteractiveServer
+@using WebApp.Blazor.Services
+@inject ApiGatewayClient Api
+@inject NavigationManager Nav
+
+<h1>Edit Product</h1>
+
+@if (isLoading)
+{
+    <p>Loading product...</p>
+}
+else if (!string.IsNullOrEmpty(errorMessage))
+{
+    <p class="text-danger">@errorMessage</p>
+}
+else
+{
+    <EditForm Model="model" OnValidSubmit="HandleValidSubmit">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+
+        <div class="mb-3">
+            <label class="form-label">Name</label>
+            <InputText class="form-control" @bind-Value="model.Name" />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Price</label>
+            <InputNumber class="form-control" @bind-Value="model.Price" />
+        </div>
+
+        <button type="submit" class="btn btn-primary" disabled="@isSaving">
+            @(isSaving ? "Saving..." : "Save")
+        </button>
+        <a class="btn btn-secondary ms-2" href="/products">Cancel</a>
+    </EditForm>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private ProductUpsertRequest model = new();
+    private bool isLoading = true;
+    private bool isSaving;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var product = await Api.GetProductAsync(Id);
+            if (product is null)
+            {
+                errorMessage = "Product not found.";
+                return;
+            }
+
+            model.Name = product.Name;
+            model.Price = product.Price;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to load product: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        errorMessage = null;
+
+        try
+        {
+            isSaving = true;
+            var ok = await Api.UpdateProductAsync(Id, model);
+
+            if (!ok)
+            {
+                errorMessage = "Failed to update product.";
+                return;
+            }
+
+            Nav.NavigateTo("/products");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error updating product: {ex.Message}";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+}
