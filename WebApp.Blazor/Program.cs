@@ -8,20 +8,24 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-// Add ApiGatewayOptions configuration
+// ApiGateway config
 builder.Services.Configure<ApiGatewayOptions>(
     builder.Configuration.GetSection("ApiGateway"));
 
-// Add Http Client for ApiGatewayService
+// Shared auth state
+builder.Services.AddSingleton<AuthState>();
+
+// HttpClient for the gateway
 builder.Services.AddHttpClient<ApiGatewayClient>((sp, client) =>
 {
     var opts = sp.GetRequiredService<IOptions<ApiGatewayOptions>>().Value;
+    client.BaseAddress = new Uri(opts.BaseUrl);
+});
 
-    if (string.IsNullOrWhiteSpace(opts.BaseUrl))
-    {
-        throw new InvalidOperationException("ApiGateway:BaseUrl is not configured.");
-    }
-
+// HttpClient for auth (login/register)
+builder.Services.AddHttpClient<AuthClient>((sp, client) =>
+{
+    var opts = sp.GetRequiredService<IOptions<ApiGatewayOptions>>().Value;
     client.BaseAddress = new Uri(opts.BaseUrl);
 });
 
@@ -31,9 +35,9 @@ var app = builder.Build();
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
 }
+
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 app.UseHttpsRedirection();
 

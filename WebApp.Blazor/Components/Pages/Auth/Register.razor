@@ -1,0 +1,102 @@
+﻿@page "/register"
+@using System.ComponentModel.DataAnnotations
+@rendermode InteractiveServer
+@inject WebApp.Blazor.Services.AuthClient Auth
+@inject NavigationManager Nav
+
+<PageTitle>Register</PageTitle>
+
+<div class="container my-4" style="max-width: 500px;">
+    <h2>Register</h2>
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger">@errorMessage</div>
+    }
+
+    @if (!string.IsNullOrEmpty(successMessage))
+    {
+        <div class="alert alert-success">@successMessage</div>
+    }
+
+    <EditForm Model="model" OnValidSubmit="HandleSubmit">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+
+        <div class="mb-3">
+            <label class="form-label">Email</label>
+            <InputText class="form-control" @bind-Value="model.Email" />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Password</label>
+            <InputText type="password" class="form-control" @bind-Value="model.Password" />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Confirm Password</label>
+            <InputText type="password" class="form-control" @bind-Value="model.ConfirmPassword" />
+        </div>
+
+        <button class="btn btn-primary" type="submit" disabled="@isBusy">
+            @(isBusy ? "Registering..." : "Register")
+        </button>
+
+        <a class="btn btn-link" href="/login">Already have an account?</a>
+    </EditForm>
+</div>
+
+@code {
+    private RegisterModel model = new();
+    private bool isBusy;
+    private string? errorMessage;
+    private string? successMessage;
+
+    private async Task HandleSubmit()
+    {
+        errorMessage = null;
+        successMessage = null;
+
+        if (model.Password != model.ConfirmPassword)
+        {
+            errorMessage = "Passwords do not match.";
+            return;
+        }
+
+        isBusy = true;
+
+        try
+        {
+            var ok = await Auth.RegisterAsync(model.Email, model.Password);
+            if (!ok)
+            {
+                errorMessage = "Registration failed. Check password strength or try another email.";
+                return;
+            }
+
+            successMessage = "Registration successful. You can now log in.";
+            // Optional: navigate to login automatically
+            // Nav.NavigateTo("/login");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Registration error: {ex.Message}";
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+
+    private sealed class RegisterModel
+    {
+        [Required, EmailAddress]
+        public string Email { get; set; } = string.Empty;
+
+        [Required]
+        public string Password { get; set; } = string.Empty;
+
+        [Required]
+        public string ConfirmPassword { get; set; } = string.Empty;
+    }
+}
