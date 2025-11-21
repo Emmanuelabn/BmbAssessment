@@ -24,3 +24,21 @@
 </body>
 
 </html>
+
+@code {
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+
+        var relative = Nav.ToBaseRelativePath(Nav.Uri).ToLowerInvariant();
+
+        if (!AuthState.IsAuthenticated &&
+            relative != "" &&
+            !relative.StartsWith("login") &&
+            !relative.StartsWith("register"))
+        {
+            Nav.NavigateTo("/login", forceLoad: true);
+        }
+    }
+}

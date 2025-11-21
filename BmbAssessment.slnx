@@ -15,9 +15,8 @@
     <Project Path="Services/Product/ProductService.Domain/ProductService.Domain.csproj" />
     <Project Path="Services/Product/ProductService.Infrastructure/ProductService.Infrastructure.csproj" />
   </Folder>
-  <Folder Name="/Shared/">
-    <Project Path="Shared/Shared.Contracts/Shared.Contracts.csproj" />
-    <Project Path="Shared/Shared.Infrastructure/Shared.Infrastructure.csproj" />
+  <Folder Name="/Solution Items/">
+    <File Path="docker-compose.yml" />
   </Folder>
   <Folder Name="/Web/">
     <Project Path="WebApp.Blazor/WebApp.Blazor.csproj" />

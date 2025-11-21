@@ -1,0 +1,88 @@
+version: "3.9"
+
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2019-latest
+    container_name: sqlserver
+    environment:
+      ACCEPT_EULA: 'Y'
+      MSSQL_SA_PASSWORD: 'Your_strong_Password123!'
+    ports:
+      - '1433:1433'
+    healthcheck:
+      test: [
+          'CMD-SHELL',
+          "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa \
+          -P \"$$MSSQL_SA_PASSWORD\" \
+          -Q \"SELECT 1\" -C > /dev/null || exit 1",
+        ]
+      interval: 15s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
+
+  productservice:
+    build:
+      context: .
+      dockerfile: Services/Product/ProductService.Api/Dockerfile
+    container_name: productservice
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__ProductDatabase=Server=sqlserver;Database=ProductDb;User Id=sa;Password=Your_strong_Password123!;TrustServerCertificate=True;
+      - Downstreams__SharedSecret=super-secret-internal-api-key
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    ports:
+      - "5001:8080"
+
+  orderservice:
+    build:
+      context: .
+      dockerfile: Services/Order/OrderService.Api/Dockerfile
+    container_name: orderservice
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__OrderDatabase=Server=sqlserver;Database=OrderDb;User Id=sa;Password=Your_strong_Password123!;TrustServerCertificate=True;
+      - Downstreams__SharedSecret=super-secret-internal-api-key
+      - ProductService__BaseUrl=http://productservice:8080
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    ports:
+      - "5003:8080"
+
+  apigateway:
+    build:
+      context: .
+      dockerfile: ApiGateway/Dockerfile
+    container_name: apigateway
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__EmployeeDatabase=Server=sqlserver;Database=EmployeeDb;User Id=sa;Password=Your_strong_Password123!;TrustServerCertificate=True;
+      - Jwt__Key=super-secret-signing-key-change-this
+      - Jwt__Issuer=BmbGateway
+      - Jwt__Audience=BmbGatewayClients
+      - Jwt__ExpiryMinutes=60
+      - Downstreams__SharedSecret=super-secret-internal-api-key
+      - ReverseProxy__Clusters__products_cluster__Destinations__products_destination__Address=http://productservice:8080/
+      - ReverseProxy__Clusters__orders_cluster__Destinations__orders_destination__Address=http://orderservice:8080/
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    ports:
+      - "5057:8080"
+
+  webapp:
+    build:
+      context: .
+      dockerfile: WebApp.Blazor/Dockerfile
+    container_name: webapp
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ApiGateway__BaseUrl=http://apigateway:8080
+    ports:
+      - "5198:8080"
+
+volumes:
+  sql_data:

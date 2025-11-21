@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using ProductService.Application.Services;
 using ProductService.Infrastructure;
 using ProductService.Infrastructure.Persistence;
@@ -61,6 +62,11 @@ var app = builder.Build();
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
+}
+using (var scope = app.Services.CreateScope())
+{
+    var dbContext = scope.ServiceProvider.GetRequiredService<ProductDbContext>();
+    dbContext.Database.Migrate();
 }
 
 app.UseSerilogRequestLogging();

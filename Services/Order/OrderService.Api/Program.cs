@@ -2,6 +2,7 @@ using OrderService.Application.Services;
 using OrderService.Infrastructure.Persistence;
 using OrderService.Infrastructure;
 using Serilog;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -60,6 +61,11 @@ var internalSecret = app.Configuration["InternalApi:SharedKey"];
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
+}
+using (var scope = app.Services.CreateScope())
+{
+    var dbContext = scope.ServiceProvider.GetRequiredService<OrderDbContext>();
+    dbContext.Database.Migrate();
 }
 
 app.UseSerilogRequestLogging();
